@@ -1,0 +1,47 @@
+name: Build EDK2 BaseTools
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-edk2:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout EDK2 source
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential uuid-dev iasl \
+          git nasm python3 python3-pip
+
+        python3 -m pip install --upgrade pip
+        pip3 install -r pip-requirements.txt
+
+    - name: Set up EDK2
+      run: |
+        export WORKSPACE=$GITHUB_WORKSPACE
+        export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
+        source edksetup.sh
+
+    - name: Build BaseTools
+      run: |
+        export WORKSPACE=$GITHUB_WORKSPACE
+        export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
+        source edksetup.sh
+        make -C BaseTools
+
+    # OPTIONAL: Build a platform like OvmfPkg
+    - name: Build OvmfPkg
+      run: |
+        export WORKSPACE=$GITHUB_WORKSPACE
+        export EDK_TOOLS_PATH=$WORKSPACE/BaseTools
+        source edksetup.sh
+        build -a X64 -t GCC5 -p OvmfPkg/OvmfPkgX64.dsc
