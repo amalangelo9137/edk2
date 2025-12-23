@@ -51,6 +51,7 @@
   DEFINE NETWORK_HTTP_BOOT_ENABLE       = FALSE
   DEFINE NETWORK_ALLOW_HTTP_CONNECTIONS = TRUE
   DEFINE NETWORK_ISCSI_ENABLE           = TRUE
+  DEFINE NETWORK_ISCSI_DEFAULT_ENABLE   = FALSE
   DEFINE NETWORK_PXE_BOOT_ENABLE        = TRUE
 
 !include NetworkPkg/NetworkDefines.dsc.inc
@@ -58,9 +59,7 @@
   #
   # Device drivers
   #
-  DEFINE PVSCSI_ENABLE           = FALSE
-  DEFINE MPT_SCSI_ENABLE         = FALSE
-  DEFINE LSI_SCSI_ENABLE         = FALSE
+!include OvmfPkg/Include/Dsc/OvmfOptHwDefines.dsc.inc
 
   #
   # Flash size selection. Setting FD_SIZE_IN_KB on the command line directly to
@@ -532,7 +531,7 @@
   ReportStatusCodeLib|MdeModulePkg/Library/SmmReportStatusCodeLib/StandaloneMmReportStatusCodeLib.inf
   CcExitLib|UefiCpuPkg/Library/CcExitLibNull/CcExitLibNull.inf
   MemLib|StandaloneMmPkg/Library/StandaloneMmMemLib/StandaloneMmMemLib.inf
-  DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLibStandaloneMm.inf
+  DevicePathLib|MdePkg/Library/UefiDevicePathLib/UefiDevicePathLibBase.inf
   BaseCryptLib|CryptoPkg/Library/BaseCryptLib/SmmCryptLib.inf
 
 [LibraryClasses.common.MM_CORE_STANDALONE]
@@ -542,7 +541,6 @@
   DebugLib|OvmfPkg/Library/PlatformDebugLibIoPort/PlatformDebugLibIoPort.inf
 !endif
   ExtractGuidedSectionLib|StandaloneMmPkg/Library/StandaloneMmExtractGuidedSectionLib/StandaloneMmExtractGuidedSectionLib.inf
-  FvLib|StandaloneMmPkg/Library/FvLib/FvLib.inf
   HobLib|StandaloneMmPkg/Library/StandaloneMmCoreHobLib/StandaloneMmCoreHobLib.inf
   MemoryAllocationLib|StandaloneMmPkg/Library/StandaloneMmCoreMemoryAllocationLib/StandaloneMmCoreMemoryAllocationLib.inf
   MemLib|StandaloneMmPkg/Library/StandaloneMmMemLib/StandaloneMmMemLib.inf
@@ -561,7 +559,6 @@
   gEfiMdeModulePkgTokenSpaceGuid.PcdDxeIplSupportUefiDecompress|FALSE
   gEfiMdeModulePkgTokenSpaceGuid.PcdDxeIplSwitchToLongMode|FALSE
   gEfiMdeModulePkgTokenSpaceGuid.PcdConOutGopSupport|TRUE
-  gEfiMdeModulePkgTokenSpaceGuid.PcdConOutUgaSupport|FALSE
   gEfiMdeModulePkgTokenSpaceGuid.PcdInstallAcpiSdtProtocol|TRUE
 !if $(SMM_REQUIRE) == TRUE
   gUefiOvmfPkgTokenSpaceGuid.PcdSmmSmramRequire|TRUE
@@ -946,15 +943,6 @@
   OvmfPkg/VirtioScsiDxe/VirtioScsi.inf
   OvmfPkg/VirtioSerialDxe/VirtioSerial.inf
   OvmfPkg/VirtioKeyboardDxe/VirtioKeyboard.inf
-!if $(PVSCSI_ENABLE) == TRUE
-  OvmfPkg/PvScsiDxe/PvScsiDxe.inf
-!endif
-!if $(MPT_SCSI_ENABLE) == TRUE
-  OvmfPkg/MptScsiDxe/MptScsiDxe.inf
-!endif
-!if $(LSI_SCSI_ENABLE) == TRUE
-  OvmfPkg/LsiScsiDxe/LsiScsiDxe.inf
-!endif
   MdeModulePkg/Universal/WatchdogTimerDxe/WatchdogTimer.inf
   MdeModulePkg/Universal/MonotonicCounterRuntimeDxe/MonotonicCounterRuntimeDxe.inf
   MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
@@ -1036,9 +1024,11 @@
 !include OvmfPkg/Include/Dsc/ShellComponents.dsc.inc
 !include OvmfPkg/Include/Dsc/MorLock.dsc.inc
 !include OvmfPkg/Include/Dsc/OvmfRngComponents.dsc.inc
+!include OvmfPkg/Include/Dsc/OvmfOptHwComponents.dsc.inc
 
 !if $(SECURE_BOOT_ENABLE) == TRUE
   SecurityPkg/VariableAuthenticated/SecureBootConfigDxe/SecureBootConfigDxe.inf
+  OvmfPkg/IgvmSecureBootDxe/IgvmSecureBootDxe.inf
   OvmfPkg/EnrollDefaultKeys/EnrollDefaultKeys.inf
 !endif
 
@@ -1089,6 +1079,7 @@
       SmmCpuPlatformHookLib|OvmfPkg/Library/SmmCpuPlatformHookLibQemu/SmmCpuPlatformHookLibQemu.inf
       SmmCpuFeaturesLib|OvmfPkg/Library/SmmCpuFeaturesLib/StandaloneMmCpuFeaturesLib.inf
       MmSaveStateLib|UefiCpuPkg/Library/MmSaveStateLib/AmdMmSaveStateLib.inf
+      AmdSysCallLib|UefiCpuPkg/Library/AmdSysCallLibNull/AmdSysCallLibNull.inf
       SmmCpuSyncLib|UefiCpuPkg/Library/SmmCpuSyncLib/SmmCpuSyncLib.inf
   }
 
@@ -1117,6 +1108,7 @@
        SmmCpuPlatformHookLib|OvmfPkg/Library/SmmCpuPlatformHookLibQemu/SmmCpuPlatformHookLibQemu.inf
        SmmCpuFeaturesLib|OvmfPkg/Library/SmmCpuFeaturesLib/SmmCpuFeaturesLib.inf
        MmSaveStateLib|UefiCpuPkg/Library/MmSaveStateLib/AmdMmSaveStateLib.inf
+       AmdSysCallLib|UefiCpuPkg/Library/AmdSysCallLibNull/AmdSysCallLibNull.inf
        SmmCpuSyncLib|UefiCpuPkg/Library/SmmCpuSyncLib/SmmCpuSyncLib.inf
    }
 

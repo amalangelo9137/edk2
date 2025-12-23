@@ -1,7 +1,7 @@
 /** @file
   MM IPL that load the MM Core into MMRAM at PEI stage
 
-  Copyright (c) 2024, Intel Corporation. All rights reserved.<BR>
+  Copyright (c) 2024 - 2025, Intel Corporation. All rights reserved.<BR>
   SPDX-License-Identifier: BSD-2-Clause-Patent
 
 **/
@@ -383,7 +383,7 @@ LocateMmCoreFv (
                                it is pointed to fundation and platform HOB list.
 **/
 VOID *
-CreatMmHobList (
+CreateMmHobList (
   OUT UINTN                           *HobSize,
   IN  MM_COMM_BUFFER                  *MmCommBuffer,
   IN  EFI_PHYSICAL_ADDRESS            MmFvBase,
@@ -674,20 +674,21 @@ ExecuteMmCoreFromMmram (
   IN  MM_COMM_BUFFER  *MmCommBuffer
   )
 {
-  EFI_STATUS                            Status;
-  UINTN                                 PageCount;
-  VOID                                  *MmHobList;
-  UINTN                                 MmHobSize;
-  EFI_GUID                              MmCoreFileName;
-  UINTN                                 MmFvSize;
-  EFI_PHYSICAL_ADDRESS                  MmFvBase;
-  PE_COFF_LOADER_IMAGE_CONTEXT          ImageContext;
-  STANDALONE_MM_FOUNDATION_ENTRY_POINT  Entry;
-  EFI_MMRAM_HOB_DESCRIPTOR_BLOCK        *Block;
-  EFI_PEI_MM_ACCESS_PPI                 *MmAccess;
-  UINTN                                 Size;
-  UINTN                                 Index;
-  UINTN                                 MmramRangeCount;
+  EFI_STATUS                      Status;
+  EFI_STATUS                      AccessStatus;
+  UINTN                           PageCount;
+  VOID                            *MmHobList;
+  UINTN                           MmHobSize;
+  EFI_GUID                        MmCoreFileName;
+  UINTN                           MmFvSize;
+  EFI_PHYSICAL_ADDRESS            MmFvBase;
+  PE_COFF_LOADER_IMAGE_CONTEXT    ImageContext;
+  MM_FOUNDATION_ENTRY_POINT       Entry;
+  EFI_MMRAM_HOB_DESCRIPTOR_BLOCK  *Block;
+  EFI_PEI_MM_ACCESS_PPI           *MmAccess;
+  UINTN                           Size;
+  UINTN                           Index;
+  UINTN                           MmramRangeCount;
 
   MmFvBase = 0;
   MmFvSize = 0;
@@ -744,7 +745,10 @@ ExecuteMmCoreFromMmram (
     goto Done;
   }
 
-  PageCount = (UINTN)EFI_SIZE_TO_PAGES ((UINTN)ImageContext.ImageSize + ImageContext.SectionAlignment);
+  //
+  // Align image size on section boundary and get correct page count
+  //
+  PageCount = (UINTN)EFI_SIZE_TO_PAGES ((UINTN)ALIGN_VALUE (ImageContext.ImageSize, ImageContext.SectionAlignment));
 
   //
   // Allocate memory for the image being loaded from unallocated mmram range
@@ -785,17 +789,17 @@ ExecuteMmCoreFromMmram (
       InvalidateInstructionCacheRange ((VOID *)(UINTN)ImageContext.ImageAddress, (UINTN)ImageContext.ImageSize);
 
       //
-      // Get HOB list for Standalone MM Core.
+      // Create HOB list for Standalone MM Core.
       //
       MmHobSize = 0;
-      MmHobList = CreatMmHobList (
+      MmHobList = CreateMmHobList (
                     &MmHobSize,
                     MmCommBuffer,
                     MmFvBase,
                     MmFvSize,
                     &MmCoreFileName,
                     ImageContext.ImageAddress,
-                    ImageContext.ImageSize,
+                    EFI_PAGES_TO_SIZE (PageCount),
                     ImageContext.EntryPoint,
                     Block
                     );
@@ -808,9 +812,8 @@ ExecuteMmCoreFromMmram (
       //
       // Execute image
       //
-      Entry  = (STANDALONE_MM_FOUNDATION_ENTRY_POINT)(UINTN)ImageContext.EntryPoint;
-      Status = Entry (MmHobList);
-      ASSERT_EFI_ERROR (Status);
+      Entry = (MM_FOUNDATION_ENTRY_POINT)(UINTN)ImageContext.EntryPoint;
+      Entry (MmHobList);
       FreePages (MmHobList, EFI_SIZE_TO_PAGES (MmHobSize));
     }
   }
@@ -821,11 +824,10 @@ Done:
     // Close all MMRAM ranges, if MmAccess is available.
     //
     for (Index = 0; Index < MmramRangeCount; Index++) {
-      Status = MmAccess->Close ((EFI_PEI_SERVICES **)GetPeiServicesTablePointer (), MmAccess, Index);
-      if (EFI_ERROR (Status)) {
-        DEBUG ((DEBUG_ERROR, "MM IPL failed to close MMRAM windows index %d - %r\n", Index, Status));
+      AccessStatus = MmAccess->Close ((EFI_PEI_SERVICES **)GetPeiServicesTablePointer (), MmAccess, Index);
+      if (EFI_ERROR (AccessStatus)) {
+        DEBUG ((DEBUG_ERROR, "MM IPL failed to close MMRAM windows index %d - %r\n", Index, AccessStatus));
         ASSERT (FALSE);
-        return Status;
       }
 
       //
@@ -836,18 +838,17 @@ Done:
       //
       // Lock the MMRAM (Note: Locking MMRAM may not be supported on all platforms)
       //
-      Status = MmAccess->Lock ((EFI_PEI_SERVICES **)GetPeiServicesTablePointer (), MmAccess, Index);
-      if (EFI_ERROR (Status)) {
+      AccessStatus = MmAccess->Lock ((EFI_PEI_SERVICES **)GetPeiServicesTablePointer (), MmAccess, Index);
+      if (EFI_ERROR (AccessStatus) && (AccessStatus != EFI_UNSUPPORTED)) {
         //
         // Print error message that the MMRAM failed to lock...
         //
-        DEBUG ((DEBUG_ERROR, "MM IPL could not lock MMRAM (Index %d) after executing MM Core %r\n", Index, Status));
+        DEBUG ((DEBUG_ERROR, "MM IPL could not lock MMRAM (Index %d) after executing MM Core %r\n", Index, AccessStatus));
         ASSERT (FALSE);
-        return Status;
       }
 
       //
-      // Print debug message that the MMRAM window is now closed.
+      // Print debug message that the MMRAM window is now locked.
       //
       DEBUG ((DEBUG_INFO, "MM IPL locked MMRAM window index %d\n", Index));
     }
